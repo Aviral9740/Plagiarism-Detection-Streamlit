@@ -12,16 +12,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # pip install sentence-transformers scikit-learn requests beautifulsoup4 python-dotenv
-
-try:
-    from sentence_transformers import SentenceTransformer
-
-    SBERT_AVAILABLE = True
-except ImportError:
-    print("Warning: sentence-transformers not installed. Using TF-IDF only.")
-    print("Install with: pip install sentence-transformers")
-    SBERT_AVAILABLE = False
-
 try:
     from bs4 import BeautifulSoup
 
@@ -38,10 +28,6 @@ class Config:
     def __init__(self):
         # API Keys
         self.SEARCHAPI_KEY = os.getenv('SEARCHAPI_KEY')
-
-        # Model Configuration
-        self.SBERT_MODEL = os.getenv('SBERT_MODEL', 'all-MiniLM-L6-v2')
-
         # Search Limits
         self.MAX_RESULTS_WEB = int(os.getenv('MAX_RESULTS_WEB', 5))
         self.MAX_RESULTS_SCHOLAR = int(os.getenv('MAX_RESULTS_SCHOLAR', 5))
@@ -68,14 +54,6 @@ class PlagiarismDetector:
         self.config.validate()
 
         self.searchapi_key = self.config.SEARCHAPI_KEY
-
-        # Initialize ML models
-        if SBERT_AVAILABLE:
-            print(f"Loading Sentence-BERT model ({self.config.SBERT_MODEL})...")
-            self.sbert_model = SentenceTransformer(self.config.SBERT_MODEL)
-        else:
-            self.sbert_model = None
-
         self.tfidf_vectorizer = TfidfVectorizer(
             ngram_range=(1, 3),
             max_features=5000,
@@ -143,17 +121,6 @@ class PlagiarismDetector:
         except:
             return 0.0
 
-    def calculate_sbert_similarity(self, text1: str, text2: str) -> float:
-        if not self.sbert_model:
-            return 0.0
-
-        try:
-            embeddings = self.sbert_model.encode([text1, text2])
-            similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
-            return float(similarity)
-        except:
-            return 0.0
-
     def calculate_ngram_similarity(self, text1: str, text2: str, n: int = 5) -> float:
         words1 = self.preprocess_text(text1).split()
         words2 = self.preprocess_text(text2).split()
@@ -198,32 +165,15 @@ class PlagiarismDetector:
         tfidf_sim = self.calculate_tfidf_similarity(text1, text2)
         ngram_sim = self.calculate_ngram_similarity(text1, text2, n=5)
         lcs_sim = self.calculate_lcs_similarity(text1, text2)
-
-        # Calculate SBERT
-        sbert_sim = 0.0
-        if SBERT_AVAILABLE:
-            sbert_sim = self.calculate_sbert_similarity(text1, text2)
-
-        # Weighted combination
-        if SBERT_AVAILABLE:
-            combined = (
-                    sbert_sim * 0.35 +
-                    tfidf_sim * 0.30 +
-                    ngram_sim * 0.20 +
-                    lcs_sim * 0.15
-            )
-        else:
-            combined = (
-                    tfidf_sim * 0.45 +
-                    ngram_sim * 0.35 +
-                    lcs_sim * 0.20
-            )
-
+        combined = (
+                tfidf_sim * 0.45 +
+                ngram_sim * 0.35 +
+                lcs_sim * 0.20
+        )
         return {
             'tfidf': tfidf_sim,
             'ngram': ngram_sim,
             'lcs': lcs_sim,
-            'sbert': sbert_sim,
             'combined': combined
         }
 
@@ -537,7 +487,6 @@ def main():
         detector.print_detailed_report(results)
 
     print("\n✓ Analysis complete!")
-
 
 if __name__ == "__main__":
     main()

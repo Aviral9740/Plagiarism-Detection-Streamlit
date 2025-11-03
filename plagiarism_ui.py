@@ -93,12 +93,11 @@ if st.button("🚀 Run Plagiarism Check"):
 
                         details = match['details']
                         metrics_df = pd.DataFrame({
-                            "Metric": ["TF-IDF", "N-gram", "LCS", "SBERT"],
+                            "Metric": ["TF-IDF", "N-gram", "LCS"],
                             "Score (%)": [
                                 details["tfidf"] * 100,
                                 details["ngram"] * 100,
                                 details["lcs"] * 100,
-                                details.get("sbert", 0) * 100
                             ]
                         })
 
@@ -109,5 +108,5 @@ if st.button("🚀 Run Plagiarism Check"):
 
 # Footer
 st.markdown("---")
-st.caption("⚙️ This plagiarism detector uses NLP similarity algorithms (TF-IDF, SBERT, LCS, N-gram) \
+st.caption("⚙️ This plagiarism detector uses NLP similarity algorithms (TF-IDF, LCS, N-gram) \
 and optional online sources (ArXiv, Google Scholar, Web Search).")
