@@ -11,14 +11,14 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# pip install sentence-transformers scikit-learn requests beautifulsoup4 python-dotenv
+# pip install scikit-learn requests beautifulsoup4 python-dotenv lxml
 try:
     from bs4 import BeautifulSoup
 
     BS4_AVAILABLE = True
 except ImportError:
     print("Warning: beautifulsoup4 not installed. Web scraping disabled.")
-    print("Install with: pip install beautifulsoup4")
+    print("Install with: pip install beautifulsoup4 lxml")
     BS4_AVAILABLE = False
 
 
@@ -49,11 +49,15 @@ class Config:
 
 class PlagiarismDetector:
     def __init__(self, config: Optional[Config] = None):
+        print("Initializing PlagiarismDetector...")
+
         # Load configuration
         self.config = config or Config()
         self.config.validate()
 
         self.searchapi_key = self.config.SEARCHAPI_KEY
+
+        print("Creating TF-IDF vectorizer...")
         self.tfidf_vectorizer = TfidfVectorizer(
             ngram_range=(1, 3),
             max_features=5000,
@@ -61,6 +65,7 @@ class PlagiarismDetector:
         )
 
         # Knowledge base of famous papers
+        print("Loading knowledge base...")
         self.knowledge_base = [
             {
                 'title': 'Attention Is All You Need',
@@ -95,6 +100,7 @@ class PlagiarismDetector:
                 'venue': 'NeurIPS 2014'
             }
         ]
+        print(f"✓ PlagiarismDetector initialized successfully ({len(self.knowledge_base)} papers in knowledge base)")
 
     def preprocess_text(self, text: str) -> str:
         text = text.lower()
@@ -161,15 +167,19 @@ class PlagiarismDetector:
         return lcs_length / max(m, n)
 
     def calculate_combined_similarity(self, text1: str, text2: str) -> Dict[str, float]:
+        """Calculate similarity using TF-IDF, N-gram, and LCS methods"""
         # Calculate individual similarities
         tfidf_sim = self.calculate_tfidf_similarity(text1, text2)
         ngram_sim = self.calculate_ngram_similarity(text1, text2, n=5)
         lcs_sim = self.calculate_lcs_similarity(text1, text2)
+
+        # Weighted combination
         combined = (
                 tfidf_sim * 0.45 +
                 ngram_sim * 0.35 +
                 lcs_sim * 0.20
         )
+
         return {
             'tfidf': tfidf_sim,
             'ngram': ngram_sim,
@@ -364,7 +374,7 @@ class PlagiarismDetector:
                     })
                     print(f"  ✓ Match found: {result['title'][:60]}... ({similarities['combined'] * 100:.1f}%)")
         else:
-            print("\n[3/4] Web search skipped (no API key provided)")
+            print("\n[3/4] Web search skipped (disabled or no API key)")
 
         # 4. Search Google Scholar (if enabled)
         if use_web_search and self.searchapi_key:
@@ -385,7 +395,7 @@ class PlagiarismDetector:
                     })
                     print(f"  ✓ Match found: {result['title'][:60]}... ({similarities['combined'] * 100:.1f}%)")
         else:
-            print("\n[4/4] Google Scholar search skipped (no API key provided)")
+            print("\n[4/4] Google Scholar search skipped (disabled or no API key)")
 
         # Sort by similarity
         all_matches.sort(key=lambda x: x['similarity'], reverse=True)
@@ -458,8 +468,6 @@ class PlagiarismDetector:
                 print(f"      - TF-IDF: {details['tfidf'] * 100:.1f}%")
                 print(f"      - N-gram: {details['ngram'] * 100:.1f}%")
                 print(f"      - LCS: {details['lcs'] * 100:.1f}%")
-                if details['sbert'] > 0:
-                    print(f"      - SBERT: {details['sbert'] * 100:.1f}%")
 
                 print(f"    Snippet: {match['snippet'][:200]}...")
                 print()
@@ -487,6 +495,7 @@ def main():
         detector.print_detailed_report(results)
 
     print("\n✓ Analysis complete!")
+
 
 if __name__ == "__main__":
     main()
